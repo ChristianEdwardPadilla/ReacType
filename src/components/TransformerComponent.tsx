@@ -6,6 +6,7 @@ interface PropsInt {
   focusChild: ChildInt;
 }
 
+// Transformers are Konva components that allow users to resize, drag, and rotate Rectangles
 export default class TransformerComponent extends Component<PropsInt> {
   componentDidMount() {
     this.checkNode();
