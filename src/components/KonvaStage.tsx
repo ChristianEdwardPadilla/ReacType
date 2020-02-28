@@ -4,6 +4,7 @@ import Rectangle from './Rectangle.tsx';
 import { cloneDeep } from '../utils/index.util';
 import { ComponentInt, ComponentsInt, ChildInt } from '../utils/interfaces.ts';
 
+// Props meant to totally describe the configuration of a single Rectangle
 interface PropsInt {
   components: ComponentsInt;
   focusComponent: ComponentInt;
@@ -43,14 +44,20 @@ class KonvaStage extends Component<PropsInt, StateInt> {
   }
 
   getDirectChildrenCopy(focusComponent: ComponentInt) {
+    // Find the component that is currently selected by the user
     const component = this.props.components.find(
       (comp: ComponentInt) => comp.id === focusComponent.id,
     );
 
+    // remove the pseudoChild
     const childrenArr = component.children.filter((child: ChildInt) => child.childId !== -1);
 
+    // childrenArr is a different array that component.children, but it might have nested references,
+    // so we'll need a deep copy to be sure that we aren't mutating state accidentally
     let childrenArrCopy = cloneDeep(childrenArr);
 
+    // the pseudoChild is a convenience object. Never meant to be rendered, it is a copy of the parent itself
+    // debate over whether the pseudoChild even needs to exist or what it really means rages on...
     const pseudoChild = {
       childId: -1,
       childComponentId: component.id,
@@ -100,6 +107,9 @@ class KonvaStage extends Component<PropsInt, StateInt> {
     }
   };
 
+  // handle a user click event on the Stage (see onMouseDown of Stage)
+  // the main responsibility is to change the focusChild of this component,
+  // allowing the user to change Props of that child in the bottom tab
   handleStageMouseDown = (e: any) => {
     // clicked on stage - clear selection
     if (e.target === e.target.getStage()) {
@@ -121,6 +131,9 @@ class KonvaStage extends Component<PropsInt, StateInt> {
     });
   };
 
+  // Generate a list of simple Line components (some horizontal, some vertical) with spacing of the blockSnapSize
+  // this gives a nice grid for the user to align Rectangles with.
+  // blockSnapSize is used later for snapping Rectangles to the nearest grid line
   createGrid = () => {
     const output = [];
     for (let i = 0; i < this.state.stageWidth / this.state.blockSnapSize; i++) {
@@ -179,6 +192,7 @@ class KonvaStage extends Component<PropsInt, StateInt> {
         }}
         tabIndex="0" // required for keydown event to be heard by this.container
       >
+        // The Konva stage itself
         <Stage
           className={'canvasStage'}
           ref={(node) => {
@@ -195,6 +209,9 @@ class KonvaStage extends Component<PropsInt, StateInt> {
             }}
           >
             {this.state.grid}
+            // Given the current focusComponent (changed by clicking a component tab in LeftContainer),
+            // map over the children of that component and render a Rectangle for each one
+            // (but what if those Children have Children??? See GrandchildRectangle for the recursive solution)
             {this.getDirectChildrenCopy(focusComponent)
               .map((child: ChildInt, i: number) => (
                 <Rectangle
@@ -220,6 +237,7 @@ class KonvaStage extends Component<PropsInt, StateInt> {
                 />
               ))
               .sort((rectA, rectB) => {
+                // the pseudoChild represents the parent itself and should always be "above" the other children
                 if (rectB.props.childId === -1) {
                   return 1;
                 }
