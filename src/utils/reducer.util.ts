@@ -102,6 +102,7 @@ export const closeExpanded = (components: ComponentState[], id? : number): void 
   });
 }
 
+// The action responsible for adding a child to the current focusComponent (the component selected from the left container)
 export const addChild = (
   state: ApplicationState,
   { title, childType = '', HTMLInfo = {} }: { title: string; childType: string; HTMLInfo: object },
@@ -117,8 +118,8 @@ export const addChild = (
     childType = 'HTML';
   }
 
-  // view represents the curretn FOCUSED COMPONENT - this is the component where the child is being added to
-  // we only add childrent (or do any action) to the focused omconent
+  // view represents the current FOCUSED COMPONENT - this is the component where the child is being added to
+  // we only add children (or do any action) to the focused component (blame Shlomo for typos)
   const view: ComponentState = state.components.find(comp => comp.title === state.focusComponent.title);
 
   // parentComponent is the component this child is generated from (ex. instance of Box has comp of Box)
@@ -137,7 +138,7 @@ export const addChild = (
   let htmlElemPosition: htmlElemPositionInt = { width: null, height: null };
   if (childType === 'HTML') {
     htmlElemPosition = getSize(htmlElement);
-    // if above function doesnt reutn anything, it means html element is not in our database
+    // if above function doesnt return anything, it means html element isnt' implemented yet
     if (!htmlElemPosition.width) {
       console.log(
         `Did not add html child: ${htmlElement} the GetSize function indicated that it isnt in our DB`
@@ -146,13 +147,15 @@ export const addChild = (
     }
   }
 
+  // the position of the child being added is dependent on its parent, the focusComponent (called view here)
   const newPosition =
     childType === 'COMP'
       ? {
+          // in order to avoid newly added children all overlapping each other, offset their x and y positions by a bit
           x: view.position.x + ((view.nextChildId * 16) % 150), // new children are offset by some amount, map of 150px
           y: view.position.y + ((view.nextChildId * 16) % 150),
-          width: parentComponent.position.width - 1, // new children have an initial position of their CLASS (maybe don't need 90%)
-          height: parentComponent.position.height - 1
+          width: parentComponent.position.width, // new children have the size of their corresponding component
+          height: parentComponent.position.height
         }
       : {
           x: view.position.x + view.nextChildId * 16,
@@ -161,20 +164,25 @@ export const addChild = (
           height: htmlElemPosition.height
         };
 
+  // now to create the child itself. This is all the data necessary for rendering a Rectangle
   const newChild: ChildState = {
     childId: view.nextChildId,
     childSort: view.nextChildId,
     childType,
-    childComponentId: childType === 'COMP' ? parentComponent.id : null, // only relevant fot children of type COMPONENT
+    childComponentId: childType === 'COMP' ? parentComponent.id : null, // only relevant for children of type COMP
     componentName: strippedTitle,
     position: newPosition,
-    color: null, // parentComponent.color, // only relevant fot children of type COMPONENT
-    htmlElement, // only relevant fot children of type HTML
+    color: null, // parentComponent.color, // only relevant for children of type COMP (HTML are colored black)
+    htmlElement, // only relevant for children of type HTML
     HTMLInfo
   };
-
+  
+  // alright, new child is ready to be added to this component, make a shallow copy of the focusComponent's child array
+  // and add the newChild along with (since it's being added, after all)
   const compsChildrenArr = [...view.children, newChild];
 
+  // now, make a copy of the focusComponent but with its fresh childrenArr (containing the new child)
+  // also, increment this component's childId
   const component = {
     ...view,
     children: compsChildrenArr,
@@ -182,6 +190,7 @@ export const addChild = (
     nextChildId: view.nextChildId + 1
   };
 
+  // almost there, replace the focusComponent from the entire app's component list
   const components = [
     ...state.components.filter((comp) => {
       if (comp.title !== view.title) return comp;
@@ -189,6 +198,7 @@ export const addChild = (
     component
   ];
 
+  // alright, return the new state object, new child safely within its component's children array
   return {
     ...state,
     components,
@@ -253,6 +263,7 @@ export const deleteChild = (
   };
 };
 
+// this action is 
 export const handleTransform = (
   state: ApplicationState,
   {
@@ -271,8 +282,15 @@ export const handleTransform = (
     height: number;
   }
 ) => {
+  // this pseudoChild business deserves some more explanation!!
+  // Given a blank canvas, how should the current focusComponent be represented?
+  // should it be the canvas itself? that would be a bit jarring when switching between components (left tabs)
+  // Instead, we made the "pseudoChild". It is represented as the Rectangle you first see when you add a new component
+  // but dont yet have any children
+  // It represents what will be seen when this component is added as a child of some other component
+  // Hope that helps. It is a terrible name and should be refactored to something less strange!
   if (childId === -1) {
-    // the pseudochild has been transformed, its position is stored in the component
+    // the pseudochild has been transformed, its position is stored in the component itself
     const component = state.components.find((comp) => comp.id === componentId);
     const transformedComponent = {
       ...component,
